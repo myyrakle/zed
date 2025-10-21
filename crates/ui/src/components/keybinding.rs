@@ -24,8 +24,6 @@ pub struct KeyBinding {
 
     /// Indicates whether the keybinding is currently disabled.
     disabled: bool,
-
-    action: &'static str,
 }
 
 struct VimStyle(bool);
@@ -39,9 +37,7 @@ impl KeyBinding {
             return Self::for_action_in(action, &focused, window, cx);
         }
         let key_binding = window.highest_precedence_binding_for_action(action)?;
-        let mut this = Self::new_from_gpui(key_binding, cx);
-        this.action = action.name();
-        Some(this)
+        Some(Self::new_from_gpui(key_binding, cx))
     }
 
     /// Like `for_action`, but lets you specify the context from which keybindings are matched.
@@ -52,9 +48,7 @@ impl KeyBinding {
         cx: &App,
     ) -> Option<Self> {
         let key_binding = window.highest_precedence_binding_for_action_in(action, focus)?;
-        let mut this = Self::new_from_gpui(key_binding, cx);
-        this.action = action.name();
-        Some(this)
+        Some(Self::new_from_gpui(key_binding, cx))
     }
 
     pub fn set_vim_mode(cx: &mut App, enabled: bool) {
@@ -72,7 +66,6 @@ impl KeyBinding {
             size: None,
             vim_mode: KeyBinding::is_vim_mode(cx),
             disabled: false,
-            action: "",
         }
     }
 
@@ -125,9 +118,6 @@ impl RenderOnce for KeyBinding {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let color = self.disabled.then_some(Color::Disabled);
 
-        // TODO FIXME check to make sure all actions get an self.action
-        // I kinda messed that together
-        let prefill_query = self.action.to_string();
         h_flex()
             .debug_selector(|| {
                 format!(
@@ -155,17 +145,6 @@ impl RenderOnce for KeyBinding {
                         self.vim_mode,
                     ))
             }))
-            // TODO add child if no keybind so we can set new ones too
-            .on_mouse_down_out(move |_, window, cx| {
-                window.dispatch_action(
-                    zed_actions::OpenKeymap {
-                        prefill_query: prefill_query.clone(), // FIXME PLS PLS
-                    }
-                    .boxed_clone(),
-                    cx,
-                );
-                // cx.emit(DismissEvent); // TODO close picker
-            })
     }
 }
 

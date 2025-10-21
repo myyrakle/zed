@@ -29,10 +29,9 @@ pub struct OpenZedUrl {
 
 /// Opens the keymap editor.
 #[derive(PartialEq, Clone, Deserialize, Default, JsonSchema, Action)]
-#[action(deprecated_aliases = ["zed_actions::OpenKeymapEditor"])]
 #[action(namespace = zed)]
-pub struct OpenKeymap {
-    pub prefill_query: String,
+pub struct OpenKeymapWithFilter {
+    pub filter: String,
 }
 
 actions!(
@@ -49,6 +48,9 @@ actions!(
         /// Opens the user keymap file.
         #[action(deprecated_aliases = ["zed_actions::OpenKeymap"])]
         OpenKeymapFile,
+        /// Opens the keymap editor.
+        #[action(deprecated_aliases = ["zed_actions::OpenKeymapEditor"])]
+        OpenKeymap,
         /// Opens account settings.
         OpenAccountSettings,
         /// Opens server settings.
