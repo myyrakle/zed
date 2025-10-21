@@ -68,7 +68,12 @@ pub fn app_menus(cx: &mut App) -> Vec<Menu> {
                         MenuItem::action("Open Project Settings", super::OpenProjectSettings),
                         MenuItem::action("Open Default Settings", super::OpenDefaultSettings),
                         MenuItem::separator(),
-                        MenuItem::action("Open Keymap", zed_actions::OpenKeymap),
+                        MenuItem::action(
+                            "Open Keymap",
+                            zed_actions::OpenKeymap {
+                                prefill_query: String::new(),
+                            },
+                        ),
                         MenuItem::action("Open Keymap File", zed_actions::OpenKeymapFile),
                         MenuItem::action(
                             "Open Default Key Bindings",

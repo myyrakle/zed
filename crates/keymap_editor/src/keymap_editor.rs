@@ -79,29 +79,39 @@ pub fn init(cx: &mut App) {
     let keymap_event_channel = KeymapEventChannel::new();
     cx.set_global(keymap_event_channel);
 
-    cx.on_action(|_: &OpenKeymap, cx| {
+    cx.on_action(|action: &OpenKeymap, cx| {
+        let prefill_query = action.prefill_query.clone();
         workspace::with_active_or_new_workspace(cx, move |workspace, window, cx| {
             workspace
-                .with_local_workspace(window, cx, |workspace, window, cx| {
+                .with_local_workspace(window, cx, move |workspace, window, cx| {
                     let existing = workspace
                         .active_pane()
                         .read(cx)
                         .items()
                         .find_map(|item| item.downcast::<KeymapEditor>());
 
-                    if let Some(existing) = existing {
+                    let keymap_editor = if let Some(existing) = existing {
                         workspace.activate_item(&existing, true, true, window, cx);
+                        existing
                     } else {
                         let keymap_editor =
                             cx.new(|cx| KeymapEditor::new(workspace.weak_handle(), window, cx));
                         workspace.add_item_to_active_pane(
-                            Box::new(keymap_editor),
+                            Box::new(keymap_editor.clone()),
                             None,
                             true,
                             window,
                             cx,
                         );
-                    }
+                        keymap_editor
+                    };
+
+                    keymap_editor.update(cx, |editor, cx| {
+                        editor.filter_editor.update(cx, |editor, cx| {
+                            editor.clear(window, cx);
+                            editor.insert(&prefill_query, window, cx);
+                        })
+                    })
                 })
                 .detach();
         })
