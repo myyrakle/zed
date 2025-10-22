@@ -2,21 +2,20 @@ use crate::{App, PlatformDispatcher};
 use async_task::Runnable;
 use futures::channel::mpsc;
 use smol::prelude::*;
-use std::mem::ManuallyDrop;
-use std::panic::Location;
-use std::thread::{self, ThreadId};
 use std::{
     fmt::Debug,
     marker::PhantomData,
-    mem,
+    mem::{self, ManuallyDrop},
     num::NonZeroUsize,
+    panic::Location,
     pin::Pin,
     rc::Rc,
     sync::{
         Arc,
-        atomic::{AtomicUsize, Ordering::SeqCst},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     task::{Context, Poll},
+    thread::{self, ThreadId},
     time::{Duration, Instant},
 };
 use util::TryFutureExt;
@@ -24,6 +23,11 @@ use waker_fn::waker_fn;
 
 #[cfg(any(test, feature = "test-support"))]
 use rand::rngs::StdRng;
+
+thread_local! {
+    /// Used by the crash handler to ignore panics in background threads.
+    pub static IS_DETACHED_THREAD: AtomicBool = const { AtomicBool::new(false) };
+}
 
 /// A pointer to the executor that is currently running,
 /// for spawning background tasks.
@@ -76,7 +80,10 @@ impl<T> Task<T> {
     pub fn detach(self) {
         match self {
             Task(TaskState::Ready(_)) => {}
-            Task(TaskState::Spawned(task)) => task.detach(),
+            Task(TaskState::Spawned(task)) => {
+                IS_DETACHED_THREAD.with(|v| v.store(true, Ordering::Release));
+                task.detach()
+            }
         }
     }
 }
@@ -123,7 +130,12 @@ impl TaskLabel {
     /// Construct a new task label.
     pub fn new() -> Self {
         static NEXT_TASK_LABEL: AtomicUsize = AtomicUsize::new(1);
-        Self(NEXT_TASK_LABEL.fetch_add(1, SeqCst).try_into().unwrap())
+        Self(
+            NEXT_TASK_LABEL
+                .fetch_add(1, Ordering::SeqCst)
+                .try_into()
+                .unwrap(),
+        )
     }
 }
 
@@ -271,7 +283,7 @@ impl BackgroundExecutor {
             let awoken = awoken.clone();
             let unparker = unparker.clone();
             move || {
-                awoken.store(true, SeqCst);
+                awoken.store(true, Ordering::SeqCst);
                 unparker.unpark();
             }
         });
@@ -287,7 +299,7 @@ impl BackgroundExecutor {
                     max_ticks -= 1;
 
                     if !dispatcher.tick(background_only) {
-                        if awoken.swap(false, SeqCst) {
+                        if awoken.swap(false, Ordering::SeqCst) {
                             continue;
                         }
 

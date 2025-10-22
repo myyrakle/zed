@@ -272,6 +272,11 @@ impl minidumper::ServerHandler for CrashServer {
 }
 
 pub fn panic_hook(info: &PanicHookInfo) {
+    // Don't handle a panic on threads that are not relevant to the main execution.
+    if gpui::IS_DETACHED_THREAD.with(|v| v.load(Ordering::Acquire)) {
+        return;
+    }
+
     let message = info
         .payload()
         .downcast_ref::<&str>()
